@@ -353,6 +353,12 @@
     "InvertedIndexConfig": {
       "description": "Configure the inverted index built into Weaviate",
       "properties": {
+        "cleanupIntervalSeconds": {
+          "default": 60,
+          "description": "Asynchronous index clean up happens every n seconds",
+          "format": "int",
+          "type": "number"
+        },
         "bm25": {
           "$ref": "#/definitions/BM25Config"
         },
@@ -373,12 +379,6 @@
           "default": false,
           "description": "Index length of properties",
           "type": "boolean"
-        },
-        "cleanupIntervalSeconds": {
-          "default": 60,
-          "description": "Asynchronous index clean up happens every n seconds",
-          "format": "int",
-          "type": "number"
         }
       },
       "type": "object"
@@ -669,26 +669,6 @@
           "description": "Name of the collection (a.k.a. class). Multiple words should be concatenated in CamelCase, e.g. `ArticleAuthor`.",
           "type": "string"
         },
-        "description": {
-          "description": "Description of the collection for documentation purposes.",
-          "type": "string"
-        },
-        "properties": {
-          "description": "Define properties of the collection.",
-          "items": {
-            "$ref": "#/definitions/Property"
-          },
-          "type": "array"
-        },
-        "vectorizer": {
-          "$ref": "#/definitions/Vectorizer"
-        },
-        "vectorIndexType": {
-          "$ref": "#/definitions/VectorIndexType"
-        },
-        "vectorIndexConfig": {
-          "$ref": "#/definitions/VectorIndexConfig"
-        },
         "vectorConfig": {
           "description": "Configure [named vectors](https://weaviate.io/developers/weaviate/config-refs/schema/multi-vector) for this collection. Starting from `v1.24.0`, this allows a collection to have multiple named vectors, each with its own configuration. <br/><br/>Either use this field or `vectorizer`, `vectorIndexType`, and `vectorIndexConfig` fields.",
           "type": "object",
@@ -697,6 +677,12 @@
               "$ref": "#/definitions/VectorConfig"
             }
           }
+        },
+        "vectorIndexType": {
+          "$ref": "#/definitions/VectorIndexType"
+        },
+        "vectorIndexConfig": {
+          "$ref": "#/definitions/VectorIndexConfig"
         },
         "shardingConfig": {
           "$ref": "#/definitions/ShardingConfig"
@@ -710,6 +696,9 @@
         "multiTenancyConfig": {
           "$ref": "#/definitions/MultiTenancyConfig"
         },
+        "vectorizer": {
+          "$ref": "#/definitions/Vectorizer"
+        },
         "moduleConfig": {
           "description": "Configuration specific to modules in a collection context.",
           "type": "object",
@@ -718,6 +707,17 @@
               "$ref": "#/definitions/CollectionModuleConfig"
             }
           }
+        },
+        "description": {
+          "description": "Description of the collection for documentation purposes.",
+          "type": "string"
+        },
+        "properties": {
+          "description": "Define properties of the collection.",
+          "items": {
+            "$ref": "#/definitions/Property"
+          },
+          "type": "array"
         }
       },
       "type": "object"
@@ -725,9 +725,6 @@
     "Property": {
       "required": ["name", "dataType"],
       "properties": {
-        "name": {
-          "$ref": "#/definitions/PropertyName"
-        },
         "dataType": {
           "$ref": "#/definitions/DataType"
         },
@@ -742,6 +739,15 @@
               "$ref": "#/definitions/PropertyModuleConfig"
             }
           }
+        },
+        "name": {
+          "$ref": "#/definitions/PropertyName"
+        },
+        "indexInverted": {
+          "description": "(Deprecated) Whether to include this property in the inverted index. If `false`, this property cannot be used in `where` filters, `bm25` or `hybrid` search. <br/><br/>Unrelated to vectorization behavior (deprecated as of v1.19; use indexFilterable or/and indexSearchable instead)",
+          "type": "boolean",
+          "default": true,
+          "x-nullable": true
         },
         "indexFilterable": {
           "$ref": "#/definitions/IndexFilterable"
@@ -759,12 +765,6 @@
           },
           "type": "array",
           "x-omitempty": true
-        },
-        "indexInverted": {
-          "description": "(Deprecated) Whether to include this property in the inverted index. If `false`, this property cannot be used in `where` filters, `bm25` or `hybrid` search. <br/><br/>Unrelated to vectorization behavior (deprecated as of v1.19; use indexFilterable or/and indexSearchable instead)",
-          "type": "boolean",
-          "default": true,
-          "x-nullable": true
         }
       },
       "type": "object"
@@ -2210,7 +2210,6 @@
     },
     "/.well-known/openid-configuration": {
       "get": {
-        "summary": "OIDC discovery information (if OIDC auth is enabled)",
         "description": "OIDC Discovery page, redirects to the token issuer if one is configured",
         "responses": {
           "200": {
@@ -2247,6 +2246,7 @@
             }
           }
         },
+        "summary": "OIDC discovery information (if OIDC auth is enabled)",
         "tags": [
           "well-known"
         ],
@@ -2256,7 +2256,6 @@
     },
     "/objects": {
       "get": {
-        "summary": "Get a list of objects.",
         "description": "Lists all objects in reverse order of creation, owned by the user that belongs to the used token.",
         "operationId": "objects.list",
         "x-serviceIds": [
@@ -2326,6 +2325,7 @@
             }
           }
         },
+        "summary": "Get a list of objects.",
         "tags": [
           "objects"
         ],
@@ -2333,7 +2333,6 @@
         "x-available-in-websocket": false
       },
       "post": {
-        "summary": "Create a new object.",
         "description": "Creates a new Object. Provided meta-data and schema values are validated.",
         "operationId": "objects.create",
         "x-serviceIds": [
@@ -2387,6 +2386,7 @@
             }
           }
         },
+        "summary": "Create a new object.",
         "tags": [
           "objects"
         ],
@@ -2396,7 +2396,6 @@
     },
     "/objects/{id}": {
       "delete": {
-        "summary": "Delete an object.",
         "description": "Deletes an Object from the database based on its UUID.",
         "operationId": "objects.delete",
         "x-serviceIds": [
@@ -2441,6 +2440,7 @@
             }
           }
         },
+        "summary": "Delete an object.",
         "tags": [
           "objects"
         ],
@@ -2450,7 +2450,6 @@
       },
       "get": {
         "description": "Get a specific Object based on its UUID and a Object UUID. Also available as Websocket bus.",
-        "summary": "List objects.",
         "operationId": "objects.get",
         "x-serviceIds": [
           "weaviate.local.query"
@@ -2500,6 +2499,7 @@
             }
           }
         },
+        "summary": "List objects.",
         "tags": [
           "objects"
         ],
@@ -2508,7 +2508,6 @@
         "deprecated": true
       },
       "patch": {
-        "summary": "Update an Object (patch).",
         "description": "Update an Object based on its UUID (using patch semantics). This method supports json-merge style patch semantics (RFC 7396). Provided meta-data and schema values are validated. LastUpdateTime is set to the time this function is called.",
         "operationId": "objects.patch",
         "x-serviceIds": [
@@ -2568,6 +2567,7 @@
             }
           }
         },
+        "summary": "Update an Object (patch).",
         "tags": [
           "objects"
         ],
@@ -2576,7 +2576,6 @@
         "deprecated": true
       },
       "put": {
-        "summary": "Update an object.",
         "description": "Updates an Object's data based on its UUID. Given meta-data and schema values are validated. LastUpdateTime is set to the time this function is called.",
         "operationId": "objects.update",
         "x-serviceIds": [
@@ -2635,6 +2634,7 @@
             }
           }
         },
+        "summary": "Update an object.",
         "tags": [
           "objects"
         ],
@@ -2643,7 +2643,6 @@
         "deprecated": true
       },
       "head": {
-        "summary": "Check if object exists.",
         "description": "Checks if an Object exists in the system based on its UUID.",
         "operationId": "objects.head",
         "x-serviceIds": [
@@ -2682,6 +2681,7 @@
             }
           }
         },
+        "summary": "Check if object exists.",
         "tags": [
           "objects"
         ],
@@ -2692,7 +2692,6 @@
     },
     "/objects/{className}/{id}": {
       "get": {
-        "summary": "Get an object",
         "description": "Get a data object based on its collection and UUID. Also available as Websocket bus.",
         "operationId": "objects.class.get",
         "x-serviceIds": [
@@ -2764,6 +2763,7 @@
             }
           }
         },
+        "summary": "Get an object",
         "tags": [
           "objects"
         ],
@@ -2771,7 +2771,6 @@
         "x-available-in-websocket": false
       },
       "delete": {
-        "summary": "Delete an object.",
         "description": "Delete an object based on its collection and UUID.",
         "operationId": "objects.class.delete",
         "x-serviceIds": [
@@ -2834,6 +2833,7 @@
             }
           }
         },
+        "summary": "Delete an object.",
         "tags": [
           "objects"
         ],
@@ -2841,7 +2841,6 @@
         "x-available-in-websocket": true
       },
       "put": {
-        "summary": "Update an object.",
         "description": "Update an object based on its uuid and collection.",
         "operationId": "objects.class.put",
         "x-serviceIds": [
@@ -2906,6 +2905,7 @@
             }
           }
         },
+        "summary": "Update an object.",
         "tags": [
           "objects"
         ],
@@ -2913,7 +2913,6 @@
         "x-available-in-websocket": false
       },
       "patch": {
-        "summary": "Update an object (patch).",
         "description": "Update an individual data object based on its collection and uuid. This method supports json-merge style patch semantics (RFC 7396). Provided meta-data and schema values are validated. LastUpdateTime is set to the time this function is called.",
         "operationId": "objects.class.patch",
         "x-serviceIds": [
@@ -2983,6 +2982,7 @@
             }
           }
         },
+        "summary": "Update an object (patch).",
         "tags": [
           "objects"
         ],
@@ -2990,7 +2990,6 @@
         "x-available-in-websocket": false
       },
       "head": {
-        "summary": "Checks if object exists.",
         "description": "Checks if a data object exists based on its collection and uuid without retrieving it.",
         "operationId": "objects.class.head",
         "x-serviceIds": [
@@ -3048,6 +3047,7 @@
             }
           }
         },
+        "summary": "Checks if object exists.",
         "tags": [
           "objects"
         ],
@@ -3057,7 +3057,6 @@
     },
     "/objects/{id}/references/{propertyName}": {
       "post": {
-        "summary": "Add a cross-reference.",
         "description": "Add a cross-reference.",
         "operationId": "objects.references.create",
         "x-serviceIds": [
@@ -3117,6 +3116,7 @@
             }
           }
         },
+        "summary": "Add a cross-reference.",
         "tags": [
           "objects",
           "references"
@@ -3126,7 +3126,6 @@
         "deprecated": true
       },
       "put": {
-        "summary": "Replace cross-references.",
         "description": "Replace all references in cross-reference property of an object.",
         "operationId": "objects.references.update",
         "x-serviceIds": [
@@ -3186,6 +3185,7 @@
             }
           }
         },
+        "summary": "Replace cross-references.",
         "tags": [
           "objects",
           "references"
@@ -3195,7 +3195,6 @@
         "deprecated": true
       },
       "delete": {
-        "summary": "Delete a cross-reference.",
         "description": "Delete the single reference that is given in the body from the list of references that this property has.",
         "operationId": "objects.references.delete",
         "x-serviceIds": [
@@ -3255,6 +3254,7 @@
             }
           }
         },
+        "summary": "Delete a cross-reference.",
         "tags": [
           "objects",
           "references"
@@ -3266,7 +3266,6 @@
     },
     "/objects/{className}/{id}/references/{propertyName}": {
       "post": {
-        "summary": "Add a cross-reference.",
         "description": "Add a single reference to an object.",
         "operationId": "objects.class.references.create",
         "x-serviceIds": [
@@ -3345,6 +3344,7 @@
             }
           }
         },
+        "summary": "Add a cross-reference.",
         "tags": [
           "objects",
           "references"
@@ -3353,7 +3353,6 @@
         "x-available-in-websocket": false
       },
       "put": {
-        "summary": "Replace cross-references.",
         "description": "Replace all references in cross-reference property of an object.",
         "operationId": "objects.class.references.put",
         "x-serviceIds": [
@@ -3432,6 +3431,7 @@
             }
           }
         },
+        "summary": "Replace cross-references.",
         "tags": [
           "objects",
           "references"
@@ -3440,7 +3440,6 @@
         "x-available-in-websocket": false
       },
       "delete": {
-        "summary": "Delete a cross-reference.",
         "description": "Delete the single reference that is given in the body from the list of references that this property has.",
         "operationId": "objects.class.references.delete",
         "x-serviceIds": [
@@ -3522,6 +3521,7 @@
             }
           }
         },
+        "summary": "Delete a cross-reference.",
         "tags": [
           "objects",
           "references"
@@ -3532,7 +3532,6 @@
     },
     "/objects/validate": {
       "post": {
-        "summary": "Validate an object.",
         "description": "Validate an Object's schema and meta-data. It has to be based on a schema, which is related to the given Object to be accepted by this validation.",
         "operationId": "objects.validate",
         "x-serviceIds": [
@@ -3574,6 +3573,7 @@
             }
           }
         },
+        "summary": "Validate an object.",
         "tags": [
           "objects"
         ],
@@ -3583,7 +3583,6 @@
     },
     "/batch/objects": {
       "post": {
-        "summary": "Batch create new objects.",
         "description": "Register new Objects in bulk. Provided meta-data and schema values are validated.",
         "operationId": "batch.objects.create",
         "x-serviceIds": [
@@ -3663,6 +3662,7 @@
             }
           }
         },
+        "summary": "Batch create new objects.",
         "tags": [
           "batch",
           "objects"
@@ -3671,7 +3671,6 @@
         "x-available-in-websocket": false
       },
       "delete": {
-        "summary": "Batch delete objects.",
         "description": "Batch delete objects in bulk based on a certain filter.",
         "operationId": "batch.objects.delete",
         "x-serviceIds": [
@@ -3728,6 +3727,7 @@
             }
           }
         },
+        "summary": "Batch delete objects.",
         "tags": [
           "batch",
           "objects"
@@ -3738,7 +3738,6 @@
     },
     "/batch/references": {
       "post": {
-        "summary": "Batch create cross-references.",
         "description": "Batch create cross-references between collections items (objects or objects) in bulk.",
         "operationId": "batch.references.create",
         "x-serviceIds": [
@@ -3799,6 +3798,7 @@
             }
           }
         },
+        "summary": "Batch create cross-references.",
         "tags": [
           "batch",
           "references"
@@ -3809,7 +3809,6 @@
     },
     "/graphql": {
       "post": {
-        "summary": "Perform a GraphQL query.",
         "description": "Get a response based on a GraphQL query",
         "operationId": "graphql.post",
         "x-serviceIds": [
@@ -3858,6 +3857,7 @@
             }
           }
         },
+        "summary": "Perform a GraphQL query.",
         "tags": [
           "graphql"
         ],
@@ -3867,7 +3867,6 @@
     },
     "/graphql/batch": {
       "post": {
-        "summary": "Perform batched GraphQL queries.",
         "description": "Perform batched GraphQL query",
         "operationId": "graphql.batch",
         "x-serviceIds": [
@@ -3916,6 +3915,7 @@
             }
           }
         },
+        "summary": "Perform batched GraphQL queries.",
         "tags": [
           "graphql"
         ],
@@ -3925,7 +3925,6 @@
     },
     "/meta": {
       "get": {
-        "summary": "Get instance metadata.",
         "description": "Returns meta information about the server. Can be used to provide information to another Weaviate instance that wants to interact with the current instance.",
         "operationId": "meta.get",
         "x-serviceIds": [
@@ -3954,11 +3953,35 @@
             }
           }
         },
+        "summary": "Get instance metadata.",
         "tags": [
           "meta"
         ],
         "x-available-in-mqtt": false,
         "x-available-in-websocket": false
+      }
+    },
+    "/schema/cluster-status": {
+      "get": {
+        "summary": "Get schema synchronization status.",
+        "operationId": "schema.cluster.status",
+        "tags": [
+          "schema"
+        ],
+        "responses": {
+          "200": {
+            "description": "The schema in the cluster is in sync.",
+            "schema": {
+              "$ref": "#/definitions/SchemaClusterStatus"
+            }
+          },
+          "500": {
+            "description": "The schema is either out of sync (see response body) or the sync check could not be completed.",
+            "schema": {
+              "$ref": "#/definitions/SchemaClusterStatus"
+            }
+          }
+        }
       }
     },
     "/schema": {
@@ -4042,29 +4065,6 @@
             "description": "An error has occurred while trying to fulfill the request. Most likely the ErrorResponse will contain more information about the error.",
             "schema": {
               "$ref": "#/definitions/ErrorResponse"
-            }
-          }
-        }
-      }
-    },
-    "/schema/cluster-status": {
-      "get": {
-        "summary": "Get schema synchronization status.",
-        "operationId": "schema.cluster.status",
-        "tags": [
-          "schema"
-        ],
-        "responses": {
-          "200": {
-            "description": "The schema in the cluster is in sync.",
-            "schema": {
-              "$ref": "#/definitions/SchemaClusterStatus"
-            }
-          },
-          "500": {
-            "description": "The schema is either out of sync (see response body) or the sync check could not be completed.",
-            "schema": {
-              "$ref": "#/definitions/SchemaClusterStatus"
             }
           }
         }

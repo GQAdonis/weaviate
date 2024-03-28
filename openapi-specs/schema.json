@@ -479,11 +479,11 @@
           "type": "string"
         },
         "version": {
-          "description": "Version of weaviate you are currently running",
+          "description": "The Weaviate server version.",
           "type": "string"
         },
         "modules": {
-          "description": "Module-specific meta information",
+          "description": "Module-specific meta information.",
           "type": "object"
         }
       },
@@ -1190,7 +1190,7 @@
       "description": "The summary of Weaviate's statistics.",
       "properties": {
         "shardCount": {
-          "description": "The count of Weaviate's shards.",
+          "description": "The count of Weaviate's shards. To see this value, set `output` to `verbose`.",
           "format": "int",
           "type": "number",
           "x-omitempty": false
@@ -1278,7 +1278,8 @@
             "HEALTHY",
             "UNHEALTHY",
             "UNAVAILABLE",
-            "TIMEOUT"
+            "TIMEOUT",
+            "INDEXING"
           ]
         },
         "version": {
@@ -2160,11 +2161,12 @@
       "type": "string"
     },
     "CommonOutputVerbosityParameterQuery": {
-      "description": "Controls the verbosity of the output, possible values are: \"minimal\", \"verbose\". Defaults to \"minimal\".",
+      "description": "Controls the verbosity of the output.",
       "in": "query",
       "name": "output",
       "required": false,
       "type": "string",
+      "enum": ["minimal", "verbose"],
       "default": "minimal"
     }
   },
@@ -2189,7 +2191,8 @@
               }
             }
           }
-        }
+        },
+        "tags": ["root"]
       }
     },
     "/.well-known/live": {
@@ -5172,6 +5175,10 @@
   "swagger": "2.0",
   "tags": [
     {
+      "name": "root",
+      "description": "The root of the API. Note the base url is `/v1`."
+    },
+    {
       "name": "schema",
       "description": "Operate on the database schema. <br/><br/>Note an 'Object class' in Weaviate is being renamed to a 'collection'. <br/><br/>See <a href='https://weaviate.io/developers/weaviate/manage-data/collections'>this page</a> for client code examples."
     },
@@ -5197,11 +5204,11 @@
     },
     {
       "name": "well-known",
-      "description": ".well-known endpoints"
+      "description": "`.well-known` endpoints. If OpenID Connect (OIDC) authentication is enabled, this endpoint includes OIDC configuration details."
     },
     {
       "name": "graphql",
-      "description": "Query data using the GraphQL query language."
+      "description": "Query data using the GraphQL query language. See the [Weaviate GraphQL documentation](https://weaviate.io/developers/weaviate/api/graphql) for query syntax details."
     },
     {
       "name": "classifications",

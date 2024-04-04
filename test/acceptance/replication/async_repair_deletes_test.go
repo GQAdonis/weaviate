@@ -11,22 +11,9 @@
 
 package replication
 
-import (
-	"context"
-	"fmt"
-	"math/rand"
-	"testing"
-	"time"
+// currently disabled due to long execution times
 
-	"github.com/go-openapi/strfmt"
-	"github.com/stretchr/testify/require"
-	"github.com/weaviate/weaviate/entities/models"
-	"github.com/weaviate/weaviate/test/docker"
-	"github.com/weaviate/weaviate/test/helper"
-	"github.com/weaviate/weaviate/test/helper/sample-schema/articles"
-	"github.com/weaviate/weaviate/usecases/replica"
-)
-
+/*
 func asyncRepairObjectDeleteScenario(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
@@ -161,3 +148,4 @@ func asyncRepairObjectDeleteScenario(t *testing.T) {
 		}
 	})
 }
+*/

@@ -435,5 +435,5 @@ func restartNode1(ctx context.Context, t *testing.T, compose *docker.DockerCompo
 
 func stopNode(ctx context.Context, t *testing.T, compose *docker.DockerCompose, container string) {
 	require.Nil(t, compose.Stop(ctx, container, nil))
-	<-time.After(1 * time.Second) // give time for shutdown
+	<-time.After(3 * time.Second) // give time for shutdown
 }

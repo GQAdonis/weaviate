@@ -1,7 +1,7 @@
 {
   "servers": [
       {
-        "url": "http://localhost:8080/v1"
+        "url": "http(s)://YOUR_WEAVIATE_URL:PORT/v1"
       }
   ],
   "basePath": "/v1",

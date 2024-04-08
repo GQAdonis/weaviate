@@ -671,7 +671,7 @@
           "type": "string"
         },
         "vectorConfig": {
-          "description": "Configure [named vectors](https://weaviate.io/developers/weaviate/config-refs/schema/multi-vector) for this collection. Starting from `v1.24.0`, this allows a collection to have multiple named vectors, each with its own configuration. <br/><br/>Either use this field or `vectorizer`, `vectorIndexType`, and `vectorIndexConfig` fields.",
+          "description": "Configure named vectors (https://weaviate.io/developers/weaviate/config-refs/schema/multi-vector). Either use this field or `vectorizer`, `vectorIndexType`, and `vectorIndexConfig` fields. Available from `v1.24.0`.",
           "type": "object",
           "properties": {
             "<vector_name>": {
@@ -5181,7 +5181,7 @@
     },
     {
       "name": "schema",
-      "description": "Operate on the database schema. <br/><br/>Note an 'Object class' in Weaviate is being renamed to a 'collection'. <br/><br/>See <a href='https://weaviate.io/developers/weaviate/manage-data/collections'>this page</a> for client code examples."
+      "description": "Operate on the database schema. <br/><br/>Note an 'Object class' in Weaviate is being renamed to a 'collection'. <br/><br/>See [this page](https://weaviate.io/developers/weaviate/manage-data/collections) for client code examples."
     },
     {
       "name": "objects",

@@ -43,6 +43,7 @@ import (
 	"github.com/weaviate/weaviate/entities/additional"
 	"github.com/weaviate/weaviate/entities/aggregation"
 	"github.com/weaviate/weaviate/entities/autocut"
+	"github.com/weaviate/weaviate/entities/errorcompounder"
 	enterrors "github.com/weaviate/weaviate/entities/errors"
 	"github.com/weaviate/weaviate/entities/filters"
 	"github.com/weaviate/weaviate/entities/models"
@@ -195,8 +196,47 @@ type Index struct {
 
 	// always true if lazy shard loading is off, in the case of lazy shard
 	// loading will be set to true once the last shard was loaded.
-	allShardsReady atomic.Bool
-	allocChecker   memwatch.AllocChecker
+	allShardsReady   atomic.Bool
+	allocChecker     memwatch.AllocChecker
+	shardCreateLocks *ShardCreateLocks
+}
+
+type ShardCreateLocks struct {
+	lock *sync.RWMutex // single lock for now
+}
+
+func newShardCreateLocks() *ShardCreateLocks {
+	return &ShardCreateLocks{new(sync.RWMutex)}
+}
+
+func (l *ShardCreateLocks) Lock(name string) {
+	l.lock.Lock()
+}
+
+func (l *ShardCreateLocks) Unlock(name string) {
+	l.lock.Unlock()
+}
+
+func (l *ShardCreateLocks) RLock(name string) {
+	l.lock.RLock()
+}
+
+func (l *ShardCreateLocks) RUnlock(name string) {
+	l.lock.RUnlock()
+}
+
+func (l *ShardCreateLocks) Locked(name string, callback func()) {
+	l.Lock(name)
+	defer l.Unlock(name)
+
+	callback()
+}
+
+func (l *ShardCreateLocks) RLocked(name string, callback func()) {
+	l.RLock(name)
+	defer l.RUnlock(name)
+
+	callback()
 }
 
 func (i *Index) GetShards() []ShardLike {
@@ -265,6 +305,7 @@ func NewIndex(ctx context.Context, cfg IndexConfig,
 		backupMutex:         backupMutex{log: logger, retryDuration: mutexRetryDuration, notifyDuration: mutexNotifyDuration},
 		indexCheckpoints:    indexCheckpoints,
 		allocChecker:        allocChecker,
+		shardCreateLocks:    newShardCreateLocks(),
 	}
 	index.closingCtx, index.closingCancel = context.WithCancel(context.Background())
 
@@ -555,6 +596,12 @@ func (i *Index) determineObjectShard(id strfmt.UUID, tenant string) (string, err
 	if tenant != "" {
 		if shard, status = i.getSchema.TenantShard(className, tenant); shard != "" {
 			if status == models.TenantActivityStatusHOT {
+				// node, err := i.getSchema.ShardOwner(className, shard)
+				// _ = node
+				// _ = err
+
+				// fmt.Printf("  ==> determineObjectShardAndCreateLocal: node %q err: %q local: %q\n",
+				// 	node, err, i.getSchema.NodeName())
 				return shard, nil
 			}
 			return "", objects.NewErrMultiTenancy(fmt.Errorf("%w: '%s'", errTenantNotActive, tenant))
@@ -831,6 +878,9 @@ func (i *Index) IncomingBatchPutObjects(ctx context.Context, shardName string,
 ) []error {
 	i.backupMutex.RLock()
 	defer i.backupMutex.RUnlock()
+
+	// fmt.Printf("  ==> IncomingBatchPutObjects local: %q\n", i.getSchema.NodeName())
+
 	localShard := i.localShard(shardName)
 	if localShard == nil {
 		return duplicateErr(ErrShardNotFound, len(objects))
@@ -1592,6 +1642,40 @@ func (i *Index) localShard(name string) ShardLike {
 	return i.shards.Load(name)
 }
 
+// Intended to run on "receiver" nodes, where local shard
+// is expected to exist and be active
+// Method first tries to get shard from Index::shards map,
+// or inits shard and adds it to the map if shard was not found
+func (i *Index) getOrInitLocalShard(ctx context.Context, name string) (ShardLike, error) {
+	shard := func() ShardLike {
+		i.shardCreateLocks.RLock(name)
+		defer i.shardCreateLocks.RUnlock(name)
+
+		return i.shards.Load(name)
+	}()
+
+	if shard != nil {
+		return shard, nil
+	}
+
+	return func() (ShardLike, error) {
+		i.shardCreateLocks.Lock(name)
+		defer i.shardCreateLocks.Unlock(name)
+
+		// created in the meantime
+		if shard := i.shards.Load(name); shard != nil {
+			return shard, nil
+		}
+
+		className := i.Config.ClassName.String()
+		class := i.getSchema.ReadOnlyClass(className)
+		if err := i.initAndStoreShard(ctx, name, class, i.metrics.baseMetrics); err != nil {
+			return nil, err
+		}
+		return i.shards.Load(name), nil
+	}()
+}
+
 func (i *Index) mergeObject(ctx context.Context, merge objects.MergeDocument,
 	replProps *additional.ReplicationProperties, tenant string, schemaVersion uint64,
 ) error {
@@ -1731,58 +1815,38 @@ func (i *Index) drop() error {
 	return os.RemoveAll(i.path())
 }
 
-// dropShards deletes shards in a transactional manner.
-// To confirm the deletion, the user must call Commit(true).
-// To roll back the deletion, the user must call Commit(false)
-func (i *Index) dropShards(names []string) (commit func(success bool), err error) {
-	shards := make(map[string]ShardLike, len(names))
+func (i *Index) dropShards(names []string) error {
 	i.backupMutex.RLock()
 	defer i.backupMutex.RUnlock()
 
-	// mark deleted shards
-	for _, name := range names {
-		prev, ok := i.shards.Swap(name, nil) // mark
-		if !ok {                             // shard doesn't exit
-			i.shards.LoadAndDelete(name) // rollback nil value created by swap()
-			continue
-		}
-		if prev != nil {
-			shards[name] = prev
-		}
-	}
-
-	rollback := func() {
-		for name, shard := range shards {
-			i.shards.CompareAndSwap(name, nil, shard)
-		}
-	}
-
+	ec := &errorcompounder.ErrorCompounder{}
 	eg := enterrors.NewErrorGroupWrapper(i.logger)
 	eg.SetLimit(_NUMCPU * 2)
-	commit = func(success bool) {
-		if !success {
-			rollback()
-			return
-		}
-		// detach shards
-		for name := range shards {
-			i.shards.LoadAndDelete(name)
-		}
 
-		// drop shards
-		for _, shard := range shards {
-			shard := shard
-			eg.Go(func() error {
-				if err := shard.drop(); err != nil {
-					i.logger.WithField("action", "drop_shard").
-						WithField("shard", shard.ID()).Error(err)
-				}
-				return nil
-			}, shard)
-		}
+	for _, name := range names {
+		name := name
+		eg.Go(func() error {
+			i.shardCreateLocks.Lock(name)
+			defer i.shardCreateLocks.Unlock(name)
+
+			shard, ok := i.shards.Swap(name, nil) // swap shard for nil
+			i.shards.LoadAndDelete(name)          // then remove entry
+
+			if !ok || shard == nil {
+				return nil // shard already does not exist (or inactive)
+			}
+
+			if err := shard.drop(); err != nil {
+				ec.Add(err)
+				i.logger.WithField("action", "drop_shard").
+					WithField("shard", shard.ID()).Error(err)
+			}
+			return nil
+		})
 	}
 
-	return commit, eg.Wait()
+	eg.Wait()
+	return ec.ToError()
 }
 
 func (i *Index) Shutdown(ctx context.Context) error {

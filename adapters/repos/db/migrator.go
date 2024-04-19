@@ -360,9 +360,9 @@ func (m *Migrator) UpdateTenants(ctx context.Context, class *models.Class, updat
 					return nil // shard already does not exist or inactive
 				}
 
-				if err := shard.drop(); err != nil {
+				if err := shard.Shutdown(ctx); err != nil {
 					ec.Add(err)
-					idx.logger.WithField("action", "drop_shard").
+					idx.logger.WithField("action", "shutdown_shard").
 						WithField("shard", shard.ID()).Error(err)
 				}
 				return nil
